@@ -11,25 +11,21 @@ import {
   AlertCircle, 
   CheckCircle2, 
   Sparkles, 
-  RotateCcw,
-  ShieldCheck,
-  Stethoscope,
-  Pill,
-  ShieldAlert,
-  FileSpreadsheet,
-  UserPlus,
-  ArrowRight
+  ShieldCheck, 
+  Stethoscope, 
+  Pill, 
+  ShieldAlert, 
+  FileSpreadsheet, 
+  UserPlus, 
+  Loader2 
 } from 'lucide-react';
-import { SAMPLE_PATIENTS } from '@/lib/sampleData';
 
 export default function PatientPage() {
   const { 
     patient, 
     draftPatient, 
-    patients, 
     updatePatient, 
     createPatient, 
-    selectPatient, 
     startNewPatient, 
     cancelNewPatient 
   } = useMedLens();
@@ -52,6 +48,7 @@ export default function PatientPage() {
   const [newCondition, setNewCondition] = useState('');
   const [newAllergy, setNewAllergy] = useState('');
   const [newMedication, setNewMedication] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState<string | null>(null);
 
   // Sync state if active patient or draft patient changes
@@ -69,13 +66,19 @@ export default function PatientPage() {
     });
   }, [patient, draftPatient]);
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!formData.name.trim()) {
       alert('Please enter a valid patient name.');
       return;
     }
+
+    setIsSaving(true);
+    setSavedSuccess(null);
+
+    // Realistic saving delay so loading state is clearly visible
+    await new Promise((resolve) => setTimeout(resolve, 600));
 
     if (isCreatingNew) {
       // Create new patient
@@ -85,13 +88,14 @@ export default function PatientPage() {
         lastUpdated: new Date().toISOString().split('T')[0],
       };
       createPatient(newPatientObj);
-      setSavedSuccess(`New patient "${newPatientObj.name}" (${newPatientObj.id}) successfully created and set as active patient!`);
+      setSavedSuccess(`New patient "${newPatientObj.name}" (${newPatientObj.id}) successfully created and saved!`);
     } else {
       // Update existing patient
       updatePatient(formData);
-      setSavedSuccess(`Patient profile for "${formData.name}" successfully updated!`);
+      setSavedSuccess(`Patient profile for "${formData.name}" successfully saved!`);
     }
 
+    setIsSaving(false);
     setTimeout(() => setSavedSuccess(null), 4000);
   };
 
@@ -138,12 +142,12 @@ export default function PatientPage() {
           </p>
         </div>
 
-        {/* Action Controls: + New Patient & Case Selector */}
-        <div className="flex flex-wrap items-center gap-2">
+        {/* Action Controls: + New Patient Button */}
+        <div className="flex items-center gap-2">
           {!isCreatingNew ? (
             <button
               onClick={startNewPatient}
-              className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-sky-500 to-clinical-600 hover:from-sky-400 hover:to-clinical-500 text-white font-bold text-xs shadow-md shadow-sky-500/20 flex items-center gap-1.5 transition-all hover:scale-[1.02]"
+              className="px-3.5 py-2 rounded-xl bg-sky-500 hover:bg-sky-400 text-white font-bold text-xs shadow-md flex items-center gap-1.5 transition-all hover:scale-[1.02]"
             >
               <UserPlus className="w-4 h-4" />
               + New Patient
@@ -151,34 +155,16 @@ export default function PatientPage() {
           ) : (
             <button
               onClick={cancelNewPatient}
-              className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs border border-slate-700 transition-colors"
+              className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs border border-slate-700 transition-colors"
             >
               Cancel Registration
             </button>
           )}
-
-          {/* Quick Demo Selector */}
-          <div className="hidden md:flex items-center gap-1.5 bg-slate-950 p-1.5 rounded-xl border border-slate-800 text-xs">
-            <span className="text-slate-400 font-medium px-1">Presets:</span>
-            {patients.slice(0, 3).map((p) => (
-              <button
-                key={p.id}
-                onClick={() => selectPatient(p.id)}
-                className={`px-2 py-0.5 rounded text-[11px] font-semibold transition-colors ${
-                  !isCreatingNew && patient.id === p.id 
-                    ? 'bg-sky-500 text-white' 
-                    : 'text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                {p.name.split(' ')[0]}
-              </button>
-            ))}
-          </div>
         </div>
       </div>
 
       {savedSuccess && (
-        <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs flex items-center gap-2 animate-fade-in">
+        <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs flex items-center gap-2 animate-fade-in shadow-md">
           <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
           <span className="font-semibold">{savedSuccess}</span>
         </div>
@@ -208,6 +194,7 @@ export default function PatientPage() {
                 onChange={(e) => setFormData({ ...formData, id: e.target.value })}
                 className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-800 text-sky-400 font-mono font-bold focus:outline-none focus:border-sky-500"
                 required
+                disabled={isSaving}
               />
             </div>
 
@@ -220,6 +207,7 @@ export default function PatientPage() {
                 placeholder="e.g. Jane Doe"
                 className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-800 text-white font-medium focus:outline-none focus:border-sky-500"
                 required
+                disabled={isSaving}
               />
             </div>
 
@@ -233,6 +221,7 @@ export default function PatientPage() {
                 required
                 min="0"
                 max="120"
+                disabled={isSaving}
               />
             </div>
 
@@ -242,6 +231,7 @@ export default function PatientPage() {
                 value={formData.sex}
                 onChange={(e) => setFormData({ ...formData, sex: e.target.value as any })}
                 className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-800 text-white font-medium focus:outline-none focus:border-sky-500"
+                disabled={isSaving}
               >
                 <option value="Male">Male</option>
                 <option value="Female">Female</option>
@@ -268,6 +258,7 @@ export default function PatientPage() {
                 onChange={(e) => setNewSymptom(e.target.value)}
                 placeholder="e.g. Fatigue, Fever, Shortness of breath"
                 className="flex-1 px-3 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-xs text-white focus:outline-none focus:border-sky-500"
+                disabled={isSaving}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
                     e.preventDefault();
@@ -277,8 +268,9 @@ export default function PatientPage() {
               />
               <button
                 type="button"
+                disabled={isSaving}
                 onClick={() => addItem('symptoms', newSymptom, setNewSymptom)}
-                className="px-3 py-1.5 rounded-lg bg-sky-500/20 text-sky-300 font-semibold text-xs border border-sky-400/30 hover:bg-sky-500/30"
+                className="px-3 py-1.5 rounded-lg bg-sky-500/20 text-sky-300 font-semibold text-xs border border-sky-400/30 hover:bg-sky-500/30 disabled:opacity-50"
               >
                 <Plus className="w-4 h-4" />
               </button>
@@ -288,7 +280,7 @@ export default function PatientPage() {
               {formData.symptoms.map((s, idx) => (
                 <span key={idx} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs bg-slate-800 text-slate-200 border border-slate-700">
                   {s}
-                  <button type="button" onClick={() => removeItem('symptoms', idx)} className="text-slate-400 hover:text-red-400">
+                  <button type="button" disabled={isSaving} onClick={() => removeItem('symptoms', idx)} className="text-slate-400 hover:text-red-400 disabled:opacity-50">
                     <X className="w-3 h-3" />
                   </button>
                 </span>
@@ -313,6 +305,7 @@ export default function PatientPage() {
                 onChange={(e) => setNewCondition(e.target.value)}
                 placeholder="e.g. Type 2 Diabetes, Hypertension, Asthma"
                 className="flex-1 px-3 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-xs text-white focus:outline-none focus:border-sky-500"
+                disabled={isSaving}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
                     e.preventDefault();
@@ -322,8 +315,9 @@ export default function PatientPage() {
               />
               <button
                 type="button"
+                disabled={isSaving}
                 onClick={() => addItem('existingConditions', newCondition, setNewCondition)}
-                className="px-3 py-1.5 rounded-lg bg-indigo-500/20 text-indigo-300 font-semibold text-xs border border-indigo-400/30 hover:bg-indigo-500/30"
+                className="px-3 py-1.5 rounded-lg bg-indigo-500/20 text-indigo-300 font-semibold text-xs border border-indigo-400/30 hover:bg-indigo-500/30 disabled:opacity-50"
               >
                 <Plus className="w-4 h-4" />
               </button>
@@ -333,7 +327,7 @@ export default function PatientPage() {
               {formData.existingConditions.map((c, idx) => (
                 <span key={idx} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs bg-indigo-950/40 text-indigo-300 border border-indigo-800/50">
                   {c}
-                  <button type="button" onClick={() => removeItem('existingConditions', idx)} className="text-indigo-400 hover:text-red-400">
+                  <button type="button" disabled={isSaving} onClick={() => removeItem('existingConditions', idx)} className="text-indigo-400 hover:text-red-400 disabled:opacity-50">
                     <X className="w-3 h-3" />
                   </button>
                 </span>
@@ -358,6 +352,7 @@ export default function PatientPage() {
                 onChange={(e) => setNewAllergy(e.target.value)}
                 placeholder="e.g. Penicillin, Sulfa, NKDA"
                 className="flex-1 px-3 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-xs text-white focus:outline-none focus:border-sky-500"
+                disabled={isSaving}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
                     e.preventDefault();
@@ -367,8 +362,9 @@ export default function PatientPage() {
               />
               <button
                 type="button"
+                disabled={isSaving}
                 onClick={() => addItem('allergies', newAllergy, setNewAllergy)}
-                className="px-3 py-1.5 rounded-lg bg-red-500/20 text-red-300 font-semibold text-xs border border-red-400/30 hover:bg-red-500/30"
+                className="px-3 py-1.5 rounded-lg bg-red-500/20 text-red-300 font-semibold text-xs border border-red-400/30 hover:bg-red-500/30 disabled:opacity-50"
               >
                 <Plus className="w-4 h-4" />
               </button>
@@ -378,7 +374,7 @@ export default function PatientPage() {
               {formData.allergies.map((a, idx) => (
                 <span key={idx} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs bg-red-950/40 text-red-300 border border-red-800/50">
                   {a}
-                  <button type="button" onClick={() => removeItem('allergies', idx)} className="text-red-400 hover:text-white">
+                  <button type="button" disabled={isSaving} onClick={() => removeItem('allergies', idx)} className="text-red-400 hover:text-white disabled:opacity-50">
                     <X className="w-3 h-3" />
                   </button>
                 </span>
@@ -403,6 +399,7 @@ export default function PatientPage() {
                 onChange={(e) => setNewMedication(e.target.value)}
                 placeholder="e.g. Metformin 500mg, Amoxicillin"
                 className="flex-1 px-3 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-xs text-white focus:outline-none focus:border-sky-500"
+                disabled={isSaving}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
                     e.preventDefault();
@@ -412,8 +409,9 @@ export default function PatientPage() {
               />
               <button
                 type="button"
+                disabled={isSaving}
                 onClick={() => addItem('currentMedications', newMedication, setNewMedication)}
-                className="px-3 py-1.5 rounded-lg bg-emerald-500/20 text-emerald-300 font-semibold text-xs border border-emerald-400/30 hover:bg-emerald-500/30"
+                className="px-3 py-1.5 rounded-lg bg-emerald-500/20 text-emerald-300 font-semibold text-xs border border-emerald-400/30 hover:bg-emerald-500/30 disabled:opacity-50"
               >
                 <Plus className="w-4 h-4" />
               </button>
@@ -423,7 +421,7 @@ export default function PatientPage() {
               {formData.currentMedications.map((m, idx) => (
                 <span key={idx} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs bg-emerald-950/40 text-emerald-300 border border-emerald-800/50">
                   {m}
-                  <button type="button" onClick={() => removeItem('currentMedications', idx)} className="text-emerald-400 hover:text-white">
+                  <button type="button" disabled={isSaving} onClick={() => removeItem('currentMedications', idx)} className="text-emerald-400 hover:text-white disabled:opacity-50">
                     <X className="w-3 h-3" />
                   </button>
                 </span>
@@ -442,7 +440,8 @@ export default function PatientPage() {
             <button
               type="button"
               onClick={cancelNewPatient}
-              className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs border border-slate-700 transition-colors"
+              disabled={isSaving}
+              className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs border border-slate-700 transition-colors disabled:opacity-50"
             >
               Cancel
             </button>
@@ -450,10 +449,20 @@ export default function PatientPage() {
 
           <button
             type="submit"
-            className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-sky-500 to-clinical-600 hover:from-sky-400 hover:to-clinical-500 text-white font-bold text-xs shadow-lg shadow-sky-500/25 flex items-center gap-2 transition-all hover:scale-[1.02]"
+            disabled={isSaving}
+            className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-sky-500 to-clinical-600 hover:from-sky-400 hover:to-clinical-500 text-white font-bold text-xs shadow-lg shadow-sky-500/25 flex items-center gap-2 transition-all hover:scale-[1.02] disabled:opacity-75 disabled:cursor-not-allowed"
           >
-            <Save className="w-4 h-4" />
-            {isCreatingNew ? 'Create Patient Profile & Initialize Timeline' : 'Save Patient Profile Changes'}
+            {isSaving ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin text-white" />
+                <span>{isCreatingNew ? 'Creating Patient Profile...' : 'Saving Profile Changes...'}</span>
+              </>
+            ) : (
+              <>
+                <Save className="w-4 h-4" />
+                <span>{isCreatingNew ? 'Create Patient Profile & Initialize Timeline' : 'Save Patient Profile Changes'}</span>
+              </>
+            )}
           </button>
         </div>
 

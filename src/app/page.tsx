@@ -18,7 +18,6 @@ import {
   CheckCircle2, 
   ShieldCheck, 
   BarChart3,
-  Flame,
   HelpCircle,
   Clock,
   Calendar,
@@ -27,7 +26,7 @@ import {
 
 export default function DashboardPage() {
   const router = useRouter();
-  const { patient, tests, reports, conflicts, aiSummary, timelineEvents, loadSampleData, startNewPatient } = useMedLens();
+  const { patient, tests, reports, conflicts, aiSummary, timelineEvents, startNewPatient } = useMedLens();
 
   const highCount = tests.filter(t => t.status === 'HIGH').length;
   const lowCount = tests.filter(t => t.status === 'LOW').length;
@@ -72,13 +71,13 @@ export default function DashboardPage() {
               + New Patient
             </button>
 
-            <button
-              onClick={() => loadSampleData(0)}
-              className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 font-semibold text-xs flex items-center gap-2 transition-all"
+            <Link
+              href="/upload"
+              className="px-4 py-2 rounded-xl bg-gradient-to-r from-sky-500 to-clinical-600 hover:from-sky-400 hover:to-clinical-500 text-white font-semibold text-xs flex items-center gap-2 shadow-lg shadow-sky-500/25 transition-all"
             >
-              <Flame className="w-4 h-4 text-sky-400" />
-              Reset Demo Profile
-            </button>
+              <UploadCloud className="w-4 h-4" />
+              Upload Medical Report
+            </Link>
           </div>
         </div>
       </div>

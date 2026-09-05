@@ -13,9 +13,6 @@ import {
   GitCompare, 
   AlertTriangle, 
   ChevronDown, 
-  RefreshCw,
-  PlusCircle,
-  FileCheck,
   Clock,
   UserPlus,
   Check
@@ -29,7 +26,6 @@ export function Navbar() {
     patients, 
     selectPatient, 
     startNewPatient, 
-    loadSampleData, 
     conflicts, 
     tests, 
     timelineEvents,
@@ -58,7 +54,7 @@ export function Navbar() {
 
   return (
     <header className="sticky top-0 z-40 bg-slate-900 border-b border-slate-800 shadow-lg text-white">
-      {/* Top Bar: Brand & Patient Selector & Demo Action */}
+      {/* Top Bar: Brand & Patient Selector */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16 gap-4">
           
@@ -73,7 +69,7 @@ export function Navbar() {
                   Med<span className="text-sky-400">Lens</span>
                 </span>
                 <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-500/20 text-sky-300 border border-sky-400/30 uppercase tracking-wider">
-                  PromptWars Edition
+                  Clinical Intelligence
                 </span>
               </div>
               <p className="text-[11px] text-slate-400 hidden sm:block">
@@ -82,7 +78,7 @@ export function Navbar() {
             </div>
           </Link>
 
-          {/* Right Actions: Patient Dropdown & Quick Demo Loader */}
+          {/* Right Actions: Patient Dropdown & + New Patient Button */}
           <div className="flex items-center gap-3">
             
             {/* Patient Context Dropdown */}
@@ -148,19 +144,6 @@ export function Navbar() {
                     })}
                   </div>
 
-                  <div className="border-t border-slate-700/60 mt-1 pt-1 px-2">
-                    <button
-                      onClick={() => {
-                        loadSampleData(0);
-                        setDropdownOpen(false);
-                      }}
-                      className="w-full text-left px-2 py-1.5 rounded bg-slate-900/60 text-slate-300 hover:bg-slate-700 flex items-center gap-1.5 text-[11px] font-medium"
-                    >
-                      <RefreshCw className="w-3 h-3 text-sky-400" />
-                      Reset to Demo Patient (John Doe)
-                    </button>
-                  </div>
-
                 </div>
               )}
             </div>
@@ -168,22 +151,13 @@ export function Navbar() {
             {/* Direct + New Patient Quick Action Button */}
             <button
               onClick={handleStartNewPatient}
-              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-500/20 hover:bg-sky-500/30 border border-sky-400/40 text-sky-300 font-semibold text-xs transition-all hover:scale-[1.02]"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-500 hover:bg-sky-400 text-white font-semibold text-xs shadow-md transition-all hover:scale-[1.02]"
               title="Create a new patient profile"
             >
-              <UserPlus className="w-3.5 h-3.5 text-sky-400" />
+              <UserPlus className="w-3.5 h-3.5 text-white" />
               <span>+ New Patient</span>
             </button>
 
-            {/* Quick Demo Loader Button for Hackathon Judges */}
-            <button
-              onClick={() => loadSampleData(0)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-sky-500 to-clinical-600 hover:from-sky-400 hover:to-clinical-500 text-white font-semibold text-xs shadow-md shadow-sky-500/20 transition-all hover:scale-[1.02]"
-              title="Click to reset to complete demo dataset for testing"
-            >
-              <FileCheck className="w-3.5 h-3.5" />
-              <span className="hidden md:inline">1-Click Demo Data</span>
-            </button>
           </div>
         </div>
 
