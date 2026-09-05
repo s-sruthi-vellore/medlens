@@ -77,10 +77,29 @@ export interface AISummaryData {
     status: TestStatus;
     provenance: Provenance;
   }[];
-  stabilityStatus: string; // e.g., "Stable overall with 2 flagged lab markers"
+  stabilityStatus: string;
   glossaryTerms: {
     term: string;
     definition: string;
   }[];
   disclaimer: string;
+}
+
+export type TimelineEventType = 
+  | 'patient_update' 
+  | 'report_uploaded' 
+  | 'report_processed' 
+  | 'record_extracted' 
+  | 'record_updated' 
+  | 'summary_generated';
+
+export interface TimelineEvent {
+  id: string;
+  timestamp: string; // ISO string
+  formattedDate: string; // e.g. "Sep 5, 2026, 12:45 PM"
+  title: string;
+  description: string;
+  provenance: Provenance;
+  type: TimelineEventType;
+  patientId: string;
 }

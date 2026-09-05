@@ -18,11 +18,13 @@ import {
   ShieldCheck, 
   BarChart3,
   Flame,
-  HelpCircle
+  HelpCircle,
+  Clock,
+  Calendar
 } from 'lucide-react';
 
 export default function DashboardPage() {
-  const { patient, tests, reports, conflicts, aiSummary, loadSampleData } = useMedLens();
+  const { patient, tests, reports, conflicts, aiSummary, timelineEvents, loadSampleData } = useMedLens();
 
   const highCount = tests.filter(t => t.status === 'HIGH').length;
   const lowCount = tests.filter(t => t.status === 'LOW').length;
@@ -207,34 +209,31 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* AI Summary Highlight Box */}
-          {aiSummary && (
-            <div className="bg-gradient-to-br from-slate-900 via-slate-900 to-sky-950/40 border border-sky-500/30 rounded-xl p-5 space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Sparkles className="w-5 h-5 text-sky-400" />
-                  <h3 className="font-bold text-sm text-white">AI Summary Snapshot</h3>
-                </div>
-                <ProvenanceBadge provenance="AI Generated" />
+          {/* Patient Timeline Activity Card Widget */}
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-3">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2">
+                <Clock className="w-5 h-5 text-sky-400" />
+                <h3 className="font-bold text-sm text-white">Recent Patient Timeline</h3>
               </div>
-              
-              <p className="text-xs text-slate-300 leading-relaxed line-clamp-4">
-                {aiSummary.summaryText}
-              </p>
-
-              <div className="pt-2 border-t border-slate-800 flex items-center justify-between">
-                <span className="text-[11px] text-slate-400">
-                  {aiSummary.stabilityStatus}
-                </span>
-                <Link
-                  href="/summary"
-                  className="text-xs font-semibold text-sky-400 hover:text-sky-300 flex items-center gap-1"
-                >
-                  View Full Summary <ArrowRight className="w-3.5 h-3.5" />
-                </Link>
-              </div>
+              <Link href="/timeline" className="text-xs font-semibold text-sky-400 hover:text-sky-300 flex items-center gap-1">
+                View All ({timelineEvents.length}) <ArrowRight className="w-3 h-3" />
+              </Link>
             </div>
-          )}
+
+            <div className="space-y-3 pt-1">
+              {timelineEvents.slice(0, 3).map((ev) => (
+                <div key={ev.id} className="p-2.5 rounded-lg bg-slate-950 border border-slate-800 text-xs space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-slate-200">{ev.title}</span>
+                    <ProvenanceBadge provenance={ev.provenance} />
+                  </div>
+                  <p className="text-[11px] text-slate-400 line-clamp-1">{ev.description}</p>
+                  <div className="text-[10px] text-slate-500 font-mono text-right">{ev.formattedDate}</div>
+                </div>
+              ))}
+            </div>
+          </div>
 
         </div>
 
@@ -330,15 +329,15 @@ export default function DashboardPage() {
             </Link>
 
             <Link
-              href="/compare"
+              href="/timeline"
               className="bg-slate-900 border border-slate-800 hover:border-sky-500/50 rounded-xl p-4 flex items-center gap-3 transition-all hover:scale-[1.01] group"
             >
-              <div className="w-10 h-10 rounded-lg bg-indigo-500/10 text-indigo-400 flex items-center justify-center shrink-0 group-hover:bg-indigo-500 group-hover:text-white transition-colors">
-                <BarChart3 className="w-5 h-5" />
+              <div className="w-10 h-10 rounded-lg bg-sky-500/10 text-sky-400 flex items-center justify-center shrink-0 group-hover:bg-sky-500 group-hover:text-white transition-colors">
+                <Clock className="w-5 h-5 text-sky-400" />
               </div>
               <div>
-                <h4 className="font-bold text-xs text-slate-200">Lab Trends</h4>
-                <p className="text-[11px] text-slate-400">Multi-report matrix</p>
+                <h4 className="font-bold text-xs text-slate-200">Patient Timeline</h4>
+                <p className="text-[11px] text-slate-400">Chronological history</p>
               </div>
             </Link>
 

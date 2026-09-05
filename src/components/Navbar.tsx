@@ -15,13 +15,14 @@ import {
   ChevronDown, 
   RefreshCw,
   PlusCircle,
-  FileCheck
+  FileCheck,
+  Clock
 } from 'lucide-react';
 import { SAMPLE_PATIENTS } from '@/lib/sampleData';
 
 export function Navbar() {
   const pathname = usePathname();
-  const { patient, selectPatient, loadSampleData, conflicts, tests } = useMedLens();
+  const { patient, selectPatient, loadSampleData, conflicts, tests, timelineEvents } = useMedLens();
   const [dropdownOpen, setDropdownOpen] = useState(false);
 
   const unresolvedConflicts = conflicts.filter(c => !c.resolved).length;
@@ -31,6 +32,7 @@ export function Navbar() {
     { name: 'Patient Info', href: '/patient', icon: User },
     { name: 'Medical Reports', href: '/upload', icon: UploadCloud },
     { name: 'Structured Record', href: '/record', icon: Table, count: tests.length },
+    { name: 'Patient Timeline', href: '/timeline', icon: Clock, count: timelineEvents.length },
     { name: 'AI Summary', href: '/summary', icon: Sparkles },
     { name: 'Comparison', href: '/compare', icon: GitCompare },
     { name: 'Conflicts', href: '/conflicts', icon: AlertTriangle, badge: unresolvedConflicts },
@@ -83,7 +85,7 @@ export function Navbar() {
                   <div className="px-3 py-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-700/60">
                     Select Patient Case
                   </div>
-                  {SAMPLE_PATIENTS.map((p, idx) => (
+                  {SAMPLE_PATIENTS.map((p) => (
                     <button
                       key={p.id}
                       onClick={() => {
