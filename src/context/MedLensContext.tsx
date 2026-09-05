@@ -10,7 +10,9 @@ import {
 import { detectConflicts, generateLocalAISummary, evaluateTestStatus } from '@/lib/evaluator';
 
 interface MedLensContextType {
+  patients: Patient[];
   patient: Patient;
+  draftPatient: Patient | null;
   reports: MedicalReport[];
   tests: TestResult[];
   conflicts: ConflictItem[];
@@ -18,6 +20,9 @@ interface MedLensContextType {
   timelineEvents: TimelineEvent[];
   activePatientId: string;
   selectPatient: (patientId: string) => void;
+  startNewPatient: () => void;
+  cancelNewPatient: () => void;
+  createPatient: (newPatient: Patient) => void;
   updatePatient: (updated: Partial<Patient>) => void;
   addReport: (report: MedicalReport) => void;
   addTests: (newTests: TestResult[]) => void;
@@ -31,7 +36,7 @@ interface MedLensContextType {
 
 const MedLensContext = createContext<MedLensContextType | undefined>(undefined);
 
-function formatTimelineDate(date: Date): string {
+export function formatTimelineDate(date: Date): string {
   return date.toLocaleDateString('en-US', {
     month: 'short',
     day: 'numeric',
@@ -42,7 +47,8 @@ function formatTimelineDate(date: Date): string {
   });
 }
 
-const INITIAL_TIMELINE_EVENTS: TimelineEvent[] = [
+// Initial Sample Timelines per patient
+const INITIAL_TIMELINE_EVENTS_PT1: TimelineEvent[] = [
   {
     id: 'tl-1',
     timestamp: new Date(Date.now() - 3600000 * 3).toISOString(),
@@ -95,25 +101,178 @@ const INITIAL_TIMELINE_EVENTS: TimelineEvent[] = [
   }
 ];
 
+const INITIAL_TIMELINE_EVENTS_PT2: TimelineEvent[] = [
+  {
+    id: 'tl-s1',
+    timestamp: new Date(Date.now() - 3600000 * 1).toISOString(),
+    formattedDate: formatTimelineDate(new Date(Date.now() - 3600000 * 1)),
+    title: 'Patient Information Loaded',
+    description: 'Loaded profile for Sarah Jenkins (Severe Fatigue, Cold Sensitivity)',
+    provenance: 'Patient Input',
+    type: 'patient_update',
+    patientId: 'PT-33104'
+  },
+  {
+    id: 'tl-s2',
+    timestamp: new Date(Date.now() - 3600000 * 0.8).toISOString(),
+    formattedDate: formatTimelineDate(new Date(Date.now() - 3600000 * 0.8)),
+    title: 'Medical Report Processed',
+    description: 'Sarah_Jenkins_Hematology_Panel.pdf processed with 2 extracted markers',
+    provenance: 'Medical Report',
+    type: 'report_processed',
+    patientId: 'PT-33104'
+  }
+];
+
+const INITIAL_TIMELINE_EVENTS_PT3: TimelineEvent[] = [
+  {
+    id: 'tl-m1',
+    timestamp: new Date(Date.now() - 3600000 * 0.5).toISOString(),
+    formattedDate: formatTimelineDate(new Date(Date.now() - 3600000 * 0.5)),
+    title: 'Patient Profile Selected',
+    description: 'Loaded profile for Marcus Vance (Renal Status)',
+    provenance: 'Patient Input',
+    type: 'patient_update',
+    patientId: 'PT-51299'
+  }
+];
+
+const SARAH_TESTS: TestResult[] = [
+  {
+    id: 'tr-s1',
+    testName: 'Hemoglobin',
+    value: 9.8,
+    unit: 'g/dL',
+    referenceRange: '12.0 - 16.0',
+    status: evaluateTestStatus(9.8, '12.0 - 16.0'),
+    date: '2026-09-04',
+    observations: 'Note: Patient reports history of Amoxicillin rash during childhood.',
+    provenance: 'Medical Report',
+    confidence: 96,
+    category: 'Hematology',
+    verifiedByHuman: true,
+    reportId: 'REP-SARAH-01',
+    reportName: 'Sarah_Jenkins_Hematology_Panel.pdf'
+  },
+  {
+    id: 'tr-s2',
+    testName: 'Ferritin',
+    value: 11,
+    unit: 'ng/mL',
+    referenceRange: '15 - 150',
+    status: evaluateTestStatus(11, '15 - 150'),
+    date: '2026-09-04',
+    observations: 'Iron storage depleted.',
+    provenance: 'Medical Report',
+    confidence: 94,
+    category: 'Hematology',
+    verifiedByHuman: true,
+    reportId: 'REP-SARAH-01',
+    reportName: 'Sarah_Jenkins_Hematology_Panel.pdf'
+  }
+];
+
+const MARCUS_TESTS: TestResult[] = [
+  {
+    id: 'tr-m1',
+    testName: 'eGFR',
+    value: 52,
+    unit: 'mL/min/1.73m2',
+    referenceRange: '> 60',
+    status: evaluateTestStatus(52, '> 60'),
+    date: '2026-08-28',
+    observations: 'Estimated glomerular filtration rate low.',
+    provenance: 'Medical Report',
+    confidence: 97,
+    category: 'Renal',
+    verifiedByHuman: true,
+  }
+];
+
 export function MedLensProvider({ children }: { children: React.ReactNode }) {
+  const [patients, setPatients] = useState<Patient[]>(SAMPLE_PATIENTS);
   const [activePatientId, setActivePatientId] = useState<string>('PT-89421');
-  const [patient, setPatient] = useState<Patient>(SAMPLE_PATIENTS[0]);
-  const [reports, setReports] = useState<MedicalReport[]>(SAMPLE_REPORTS);
-  const [tests, setTests] = useState<TestResult[]>(SAMPLE_TEST_RESULTS_PATIENT_1_CURRENT);
+  const [draftPatient, setDraftPatient] = useState<Patient | null>(null);
+
+  // Maps for patient data: patientId -> items
+  const [allReports, setAllReports] = useState<Record<string, MedicalReport[]>>({
+    'PT-89421': SAMPLE_REPORTS,
+    'PT-33104': [],
+    'PT-51299': [],
+  });
+
+  const [allTests, setAllTests] = useState<Record<string, TestResult[]>>({
+    'PT-89421': SAMPLE_TEST_RESULTS_PATIENT_1_CURRENT,
+    'PT-33104': SARAH_TESTS,
+    'PT-51299': MARCUS_TESTS,
+  });
+
+  const [allTimelineEvents, setAllTimelineEvents] = useState<Record<string, TimelineEvent[]>>({
+    'PT-89421': INITIAL_TIMELINE_EVENTS_PT1,
+    'PT-33104': INITIAL_TIMELINE_EVENTS_PT2,
+    'PT-51299': INITIAL_TIMELINE_EVENTS_PT3,
+  });
+
   const [conflicts, setConflicts] = useState<ConflictItem[]>([]);
   const [aiSummary, setAiSummary] = useState<AISummaryData | null>(null);
-  const [timelineEvents, setTimelineEvents] = useState<TimelineEvent[]>(INITIAL_TIMELINE_EVENTS);
 
-  // Recalculate conflicts and summary whenever patient or tests change
+  // Load state from localStorage on mount if available
   useEffect(() => {
-    const detected = detectConflicts(patient, tests);
-    setConflicts(detected);
+    try {
+      const savedPatients = localStorage.getItem('medlens_patients');
+      const savedActiveId = localStorage.getItem('medlens_active_id');
+      const savedReports = localStorage.getItem('medlens_reports');
+      const savedTests = localStorage.getItem('medlens_tests');
+      const savedTimelines = localStorage.getItem('medlens_timelines');
 
-    const summary = generateLocalAISummary(patient, tests);
-    setAiSummary(summary);
-  }, [patient, tests]);
+      if (savedPatients) setPatients(JSON.parse(savedPatients));
+      if (savedReports) setAllReports(JSON.parse(savedReports));
+      if (savedTests) setAllTests(JSON.parse(savedTests));
+      if (savedTimelines) setAllTimelineEvents(JSON.parse(savedTimelines));
+      if (savedActiveId) setActivePatientId(savedActiveId);
+    } catch (e) {
+      console.warn('LocalStorage error on load:', e);
+    }
+  }, []);
 
-  const addTimelineEvent = (
+  // Save state changes to localStorage
+  const persistState = (
+    newPatients?: Patient[],
+    newActiveId?: string,
+    newReports?: Record<string, MedicalReport[]>,
+    newTests?: Record<string, TestResult[]>,
+    newTimelines?: Record<string, TimelineEvent[]>
+  ) => {
+    try {
+      if (newPatients) localStorage.setItem('medlens_patients', JSON.stringify(newPatients));
+      if (newActiveId) localStorage.setItem('medlens_active_id', newActiveId);
+      if (newReports) localStorage.setItem('medlens_reports', JSON.stringify(newReports));
+      if (newTests) localStorage.setItem('medlens_tests', JSON.stringify(newTests));
+      if (newTimelines) localStorage.setItem('medlens_timelines', JSON.stringify(newTimelines));
+    } catch (e) {
+      console.warn('LocalStorage error on save:', e);
+    }
+  };
+
+  // Derive current active patient & details
+  const currentPatient = draftPatient || patients.find(p => p.id === activePatientId) || patients[0] || SAMPLE_PATIENTS[0];
+  const currentReports = allReports[currentPatient.id] || [];
+  const currentTests = allTests[currentPatient.id] || [];
+  const currentTimelineEvents = allTimelineEvents[currentPatient.id] || [];
+
+  // Recalculate conflicts and summary whenever active patient or tests change
+  useEffect(() => {
+    if (!draftPatient) {
+      const detected = detectConflicts(currentPatient, currentTests);
+      setConflicts(detected);
+
+      const summary = generateLocalAISummary(currentPatient, currentTests);
+      setAiSummary(summary);
+    }
+  }, [currentPatient, currentTests, draftPatient]);
+
+  const addTimelineEventForPatient = (
+    targetPatientId: string,
     title: string,
     description: string,
     provenance: Provenance,
@@ -128,142 +287,126 @@ export function MedLensProvider({ children }: { children: React.ReactNode }) {
       description,
       provenance,
       type,
-      patientId: patient.id
+      patientId: targetPatientId
     };
-    setTimelineEvents(prev => [newEvent, ...prev]);
+
+    setAllTimelineEvents(prev => {
+      const existing = prev[targetPatientId] || [];
+      const updated = {
+        ...prev,
+        [targetPatientId]: [newEvent, ...existing]
+      };
+      persistState(undefined, undefined, undefined, undefined, updated);
+      return updated;
+    });
   };
 
   const selectPatient = (patientId: string) => {
-    const found = SAMPLE_PATIENTS.find(p => p.id === patientId);
-    if (found) {
-      setActivePatientId(patientId);
-      setPatient(found);
-      if (patientId === 'PT-89421') {
-        setReports(SAMPLE_REPORTS);
-        setTests(SAMPLE_TEST_RESULTS_PATIENT_1_CURRENT);
-        setTimelineEvents(INITIAL_TIMELINE_EVENTS);
-      } else if (patientId === 'PT-33104') {
-        setReports([]);
-        const sarahTests: TestResult[] = [
-          {
-            id: 'tr-s1',
-            testName: 'Hemoglobin',
-            value: 9.8,
-            unit: 'g/dL',
-            referenceRange: '12.0 - 16.0',
-            status: evaluateTestStatus(9.8, '12.0 - 16.0'),
-            date: '2026-09-04',
-            observations: 'Note: Patient reports history of Amoxicillin rash during childhood.',
-            provenance: 'Medical Report',
-            confidence: 96,
-            category: 'Hematology',
-            verifiedByHuman: true,
-            reportId: 'REP-SARAH-01',
-            reportName: 'Sarah_Jenkins_Hematology_Panel.pdf'
-          },
-          {
-            id: 'tr-s2',
-            testName: 'Ferritin',
-            value: 11,
-            unit: 'ng/mL',
-            referenceRange: '15 - 150',
-            status: evaluateTestStatus(11, '15 - 150'),
-            date: '2026-09-04',
-            observations: 'Iron storage depleted.',
-            provenance: 'Medical Report',
-            confidence: 94,
-            category: 'Hematology',
-            verifiedByHuman: true,
-            reportId: 'REP-SARAH-01',
-            reportName: 'Sarah_Jenkins_Hematology_Panel.pdf'
-          }
-        ];
-        setTests(sarahTests);
-        setTimelineEvents([
-          {
-            id: 'tl-s1',
-            timestamp: new Date().toISOString(),
-            formattedDate: formatTimelineDate(new Date()),
-            title: 'Patient Information Loaded',
-            description: 'Loaded profile for Sarah Jenkins (Severe Fatigue, Cold Sensitivity)',
-            provenance: 'Patient Input',
-            type: 'patient_update',
-            patientId: 'PT-33104'
-          },
-          {
-            id: 'tl-s2',
-            timestamp: new Date().toISOString(),
-            formattedDate: formatTimelineDate(new Date()),
-            title: 'Medical Report Processed',
-            description: 'Sarah_Jenkins_Hematology_Panel.pdf processed with 2 extracted markers',
-            provenance: 'Medical Report',
-            type: 'report_processed',
-            patientId: 'PT-33104'
-          }
-        ]);
-      } else {
-        setReports([]);
-        const marcusTests: TestResult[] = [
-          {
-            id: 'tr-m1',
-            testName: 'eGFR',
-            value: 52,
-            unit: 'mL/min/1.73m2',
-            referenceRange: '> 60',
-            status: evaluateTestStatus(52, '> 60'),
-            date: '2026-08-28',
-            observations: 'Estimated glomerular filtration rate low.',
-            provenance: 'Medical Report',
-            confidence: 97,
-            category: 'Renal',
-            verifiedByHuman: true,
-          }
-        ];
-        setTests(marcusTests);
-        setTimelineEvents([
-          {
-            id: 'tl-m1',
-            timestamp: new Date().toISOString(),
-            formattedDate: formatTimelineDate(new Date()),
-            title: 'Patient Profile Selected',
-            description: 'Loaded profile for Marcus Vance (Renal Status)',
-            provenance: 'Patient Input',
-            type: 'patient_update',
-            patientId: 'PT-51299'
-          }
-        ]);
-      }
-    }
+    setDraftPatient(null);
+    setActivePatientId(patientId);
+    persistState(undefined, patientId);
+  };
+
+  const startNewPatient = () => {
+    const newId = `PT-${Math.floor(10000 + Math.random() * 90000)}`;
+    const blankDraft: Patient = {
+      id: newId,
+      name: '',
+      age: 30,
+      sex: 'Male',
+      symptoms: [],
+      existingConditions: [],
+      allergies: [],
+      currentMedications: [],
+      lastUpdated: new Date().toISOString().split('T')[0]
+    };
+    setDraftPatient(blankDraft);
+  };
+
+  const cancelNewPatient = () => {
+    setDraftPatient(null);
+  };
+
+  const createPatient = (newPatient: Patient) => {
+    // 1. Add to patients list
+    const updatedPatients = [...patients, newPatient];
+    setPatients(updatedPatients);
+
+    // 2. Initialize reports and tests arrays
+    const updatedReports = { ...allReports, [newPatient.id]: [] };
+    const updatedTests = { ...allTests, [newPatient.id]: [] };
+    setAllReports(updatedReports);
+    setAllTests(updatedTests);
+
+    // 3. Create initial "Patient Profile Created" timeline event ONLY NOW upon saving
+    const now = new Date();
+    const creationEvent: TimelineEvent = {
+      id: `tl-created-${Date.now()}`,
+      timestamp: now.toISOString(),
+      formattedDate: formatTimelineDate(now),
+      title: 'Patient Profile Created',
+      description: `Patient profile created for ${newPatient.name} (${newPatient.id}). Age: ${newPatient.age}, Sex: ${newPatient.sex}. Symptoms: ${newPatient.symptoms.join(', ') || 'None reported'}.`,
+      provenance: 'Patient Input',
+      type: 'patient_update',
+      patientId: newPatient.id
+    };
+
+    const updatedTimelines = {
+      ...allTimelineEvents,
+      [newPatient.id]: [creationEvent]
+    };
+    setAllTimelineEvents(updatedTimelines);
+
+    // 4. Set active patient and reset draft
+    setActivePatientId(newPatient.id);
+    setDraftPatient(null);
+
+    // 5. Persist to localStorage
+    persistState(updatedPatients, newPatient.id, updatedReports, updatedTests, updatedTimelines);
   };
 
   const updatePatient = (updated: Partial<Patient>) => {
-    setPatient(prev => {
-      const merged = {
-        ...prev,
-        ...updated,
-        lastUpdated: new Date().toISOString().split('T')[0],
-      };
-      
-      // Log timeline event automatically
-      const symptomsStr = merged.symptoms.length > 0 ? `Symptoms: ${merged.symptoms.join(', ')}` : 'No symptoms';
-      const condStr = merged.existingConditions.length > 0 ? `Conditions: ${merged.existingConditions.join(', ')}` : 'No conditions';
-      
-      addTimelineEvent(
-        'Patient Information Updated',
-        `${merged.name} (${merged.id}): ${symptomsStr} | ${condStr}`,
-        'Patient Input',
-        'patient_update'
-      );
+    setPatients(prev => {
+      const updatedList = prev.map(p => {
+        if (p.id === currentPatient.id) {
+          const merged = {
+            ...p,
+            ...updated,
+            lastUpdated: new Date().toISOString().split('T')[0],
+          };
 
-      return merged;
+          // Log timeline event for update
+          const symptomsStr = merged.symptoms.length > 0 ? `Symptoms: ${merged.symptoms.join(', ')}` : 'No symptoms';
+          const condStr = merged.existingConditions.length > 0 ? `Conditions: ${merged.existingConditions.join(', ')}` : 'No conditions';
+          
+          addTimelineEventForPatient(
+            merged.id,
+            'Patient Information Updated',
+            `${merged.name} (${merged.id}): ${symptomsStr} | ${condStr}`,
+            'Patient Input',
+            'patient_update'
+          );
+
+          return merged;
+        }
+        return p;
+      });
+
+      persistState(updatedList);
+      return updatedList;
     });
   };
 
   const addReport = (report: MedicalReport) => {
-    setReports(prev => [report, ...prev]);
+    const pid = currentPatient.id;
+    const updatedReports = {
+      ...allReports,
+      [pid]: [report, ...(allReports[pid] || [])]
+    };
+    setAllReports(updatedReports);
 
-    // Log timeline event for Upload
-    addTimelineEvent(
+    addTimelineEventForPatient(
+      pid,
       'Medical Report Uploaded',
       `File: ${report.fileName} (${report.fileSize}) from ${report.labName}`,
       'Medical Report',
@@ -272,60 +415,84 @@ export function MedLensProvider({ children }: { children: React.ReactNode }) {
 
     if (report.tests && report.tests.length > 0) {
       addTests(report.tests);
-      
-      // Log timeline event for Processing & Extraction
-      addTimelineEvent(
+      addTimelineEventForPatient(
+        pid,
         'Report Processed & Extracted',
         `${report.tests.length} laboratory test values extracted with reference ranges`,
         'Medical Report',
         'report_processed'
       );
     }
+
+    persistState(undefined, undefined, updatedReports);
   };
 
   const addTests = (newTests: TestResult[]) => {
-    setTests(prev => [...newTests, ...prev]);
+    const pid = currentPatient.id;
+    const updatedTests = {
+      ...allTests,
+      [pid]: [...newTests, ...(allTests[pid] || [])]
+    };
+    setAllTests(updatedTests);
+    persistState(undefined, undefined, undefined, updatedTests);
   };
 
   const updateTestResult = (id: string, updated: Partial<TestResult>) => {
-    setTests(prev => prev.map(t => {
-      if (t.id === id) {
-        const merged = { ...t, ...updated };
-        if (updated.value !== undefined || updated.referenceRange !== undefined) {
-          merged.status = evaluateTestStatus(merged.value, merged.referenceRange);
+    const pid = currentPatient.id;
+    const updatedTests = {
+      ...allTests,
+      [pid]: (allTests[pid] || []).map(t => {
+        if (t.id === id) {
+          const merged = { ...t, ...updated };
+          if (updated.value !== undefined || updated.referenceRange !== undefined) {
+            merged.status = evaluateTestStatus(merged.value, merged.referenceRange);
+          }
+
+          addTimelineEventForPatient(
+            pid,
+            'Structured Record Updated',
+            `${merged.testName}: ${merged.value} ${merged.unit} (${merged.verifiedByHuman ? 'Verified by Clinician' : 'Edited'})`,
+            'Medical Report',
+            'record_updated'
+          );
+
+          return merged;
         }
+        return t;
+      })
+    };
 
-        // Log timeline event for Record Update
-        addTimelineEvent(
-          'Structured Record Updated',
-          `${merged.testName}: ${merged.value} ${merged.unit} (${merged.verifiedByHuman ? 'Verified by Clinician' : 'Edited'})`,
-          'Medical Report',
-          'record_updated'
-        );
-
-        return merged;
-      }
-      return t;
-    }));
+    setAllTests(updatedTests);
+    persistState(undefined, undefined, undefined, updatedTests);
   };
 
   const deleteTestResult = (id: string) => {
-    const found = tests.find(t => t.id === id);
-    setTests(prev => prev.filter(t => t.id !== id));
+    const pid = currentPatient.id;
+    const found = (allTests[pid] || []).find(t => t.id === id);
+    const updatedTests = {
+      ...allTests,
+      [pid]: (allTests[pid] || []).filter(t => t.id !== id)
+    };
+
+    setAllTests(updatedTests);
     if (found) {
-      addTimelineEvent(
+      addTimelineEventForPatient(
+        pid,
         'Structured Record Item Deleted',
         `Removed parameter ${found.testName} from active patient record`,
         'Medical Report',
         'record_updated'
       );
     }
+
+    persistState(undefined, undefined, undefined, updatedTests);
   };
 
   const resolveConflict = (conflictId: string) => {
     setConflicts(prev => prev.map(c => {
       if (c.id === conflictId) {
-        addTimelineEvent(
+        addTimelineEventForPatient(
+          currentPatient.id,
           'Clinical Conflict Reconciled',
           `Reconciled discrepancy: ${c.title}`,
           'Patient Input',
@@ -343,11 +510,11 @@ export function MedLensProvider({ children }: { children: React.ReactNode }) {
   };
 
   const refreshAISummary = () => {
-    const summary = generateLocalAISummary(patient, tests);
+    const summary = generateLocalAISummary(currentPatient, currentTests);
     setAiSummary(summary);
 
-    // Log timeline event for AI Summary Generation
-    addTimelineEvent(
+    addTimelineEventForPatient(
+      currentPatient.id,
       'AI Summary Generated',
       'Patient-friendly summary created with clinical safety guardrails',
       'AI Generated',
@@ -356,47 +523,45 @@ export function MedLensProvider({ children }: { children: React.ReactNode }) {
   };
 
   const resetAll = () => {
-    const newId = `PT-${Math.floor(10000 + Math.random() * 90000)}`;
-    setPatient({
-      id: newId,
-      name: 'New Patient',
-      age: 40,
-      sex: 'Male',
-      symptoms: [],
-      existingConditions: [],
-      allergies: [],
-      currentMedications: [],
-      lastUpdated: new Date().toISOString().split('T')[0]
+    try {
+      localStorage.clear();
+    } catch (e) {}
+    setPatients(SAMPLE_PATIENTS);
+    setActivePatientId('PT-89421');
+    setDraftPatient(null);
+    setAllReports({
+      'PT-89421': SAMPLE_REPORTS,
+      'PT-33104': [],
+      'PT-51299': [],
     });
-    setReports([]);
-    setTests([]);
-    setConflicts([]);
-    setAiSummary(null);
-    setTimelineEvents([
-      {
-        id: `tl-reset-${Date.now()}`,
-        timestamp: new Date().toISOString(),
-        formattedDate: formatTimelineDate(new Date()),
-        title: 'New Patient Record Created',
-        description: `Initialized empty record for ${newId}`,
-        provenance: 'Patient Input',
-        type: 'patient_update',
-        patientId: newId
-      }
-    ]);
+    setAllTests({
+      'PT-89421': SAMPLE_TEST_RESULTS_PATIENT_1_CURRENT,
+      'PT-33104': SARAH_TESTS,
+      'PT-51299': MARCUS_TESTS,
+    });
+    setAllTimelineEvents({
+      'PT-89421': INITIAL_TIMELINE_EVENTS_PT1,
+      'PT-33104': INITIAL_TIMELINE_EVENTS_PT2,
+      'PT-51299': INITIAL_TIMELINE_EVENTS_PT3,
+    });
   };
 
   return (
     <MedLensContext.Provider
       value={{
-        patient,
-        reports,
-        tests,
+        patients,
+        patient: currentPatient,
+        draftPatient,
+        reports: currentReports,
+        tests: currentTests,
         conflicts,
         aiSummary,
-        timelineEvents,
+        timelineEvents: currentTimelineEvents,
         activePatientId,
         selectPatient,
+        startNewPatient,
+        cancelNewPatient,
+        createPatient,
         updatePatient,
         addReport,
         addTests,

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useMedLens } from '@/context/MedLensContext';
 import { ProvenanceBadge } from '@/components/ProvenanceBadge';
 import { 
@@ -16,49 +16,83 @@ import {
   Stethoscope,
   Pill,
   ShieldAlert,
-  FileSpreadsheet
+  FileSpreadsheet,
+  UserPlus,
+  ArrowRight
 } from 'lucide-react';
 import { SAMPLE_PATIENTS } from '@/lib/sampleData';
 
 export default function PatientPage() {
-  const { patient, updatePatient, selectPatient, loadSampleData } = useMedLens();
-  
+  const { 
+    patient, 
+    draftPatient, 
+    patients, 
+    updatePatient, 
+    createPatient, 
+    selectPatient, 
+    startNewPatient, 
+    cancelNewPatient 
+  } = useMedLens();
+
+  const isCreatingNew = draftPatient !== null;
+  const currentTarget = draftPatient || patient;
+
   const [formData, setFormData] = useState({
-    id: patient.id,
-    name: patient.name,
-    age: patient.age,
-    sex: patient.sex,
-    symptoms: [...patient.symptoms],
-    existingConditions: [...patient.existingConditions],
-    allergies: [...patient.allergies],
-    currentMedications: [...patient.currentMedications],
+    id: currentTarget.id,
+    name: currentTarget.name,
+    age: currentTarget.age,
+    sex: currentTarget.sex,
+    symptoms: [...currentTarget.symptoms],
+    existingConditions: [...currentTarget.existingConditions],
+    allergies: [...currentTarget.allergies],
+    currentMedications: [...currentTarget.currentMedications],
   });
 
   const [newSymptom, setNewSymptom] = useState('');
   const [newCondition, setNewCondition] = useState('');
   const [newAllergy, setNewAllergy] = useState('');
   const [newMedication, setNewMedication] = useState('');
-  const [savedSuccess, setSavedSuccess] = useState(false);
+  const [savedSuccess, setSavedSuccess] = useState<string | null>(null);
 
-  // Sync if patient in context changes
-  React.useEffect(() => {
+  // Sync state if active patient or draft patient changes
+  useEffect(() => {
+    const target = draftPatient || patient;
     setFormData({
-      id: patient.id,
-      name: patient.name,
-      age: patient.age,
-      sex: patient.sex,
-      symptoms: [...patient.symptoms],
-      existingConditions: [...patient.existingConditions],
-      allergies: [...patient.allergies],
-      currentMedications: [...patient.currentMedications],
+      id: target.id,
+      name: target.name,
+      age: target.age,
+      sex: target.sex,
+      symptoms: [...target.symptoms],
+      existingConditions: [...target.existingConditions],
+      allergies: [...target.allergies],
+      currentMedications: [...target.currentMedications],
     });
-  }, [patient]);
+  }, [patient, draftPatient]);
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
-    updatePatient(formData);
-    setSavedSuccess(true);
-    setTimeout(() => setSavedSuccess(false), 3000);
+
+    if (!formData.name.trim()) {
+      alert('Please enter a valid patient name.');
+      return;
+    }
+
+    if (isCreatingNew) {
+      // Create new patient
+      const newPatientObj = {
+        ...formData,
+        name: formData.name.trim(),
+        lastUpdated: new Date().toISOString().split('T')[0],
+      };
+      createPatient(newPatientObj);
+      setSavedSuccess(`New patient "${newPatientObj.name}" (${newPatientObj.id}) successfully created and set as active patient!`);
+    } else {
+      // Update existing patient
+      updatePatient(formData);
+      setSavedSuccess(`Patient profile for "${formData.name}" successfully updated!`);
+    }
+
+    setTimeout(() => setSavedSuccess(null), 4000);
   };
 
   const addItem = (field: 'symptoms' | 'existingConditions' | 'allergies' | 'currentMedications', value: string, setter: (s: string) => void) => {
@@ -86,38 +120,67 @@ export default function PatientPage() {
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-bold text-white flex items-center gap-2">
               <User className="w-6 h-6 text-sky-400" />
-              Patient Clinical Profile
+              {isCreatingNew ? 'Create New Patient Profile' : 'Patient Clinical Profile'}
             </h1>
-            <ProvenanceBadge provenance="Patient Input" />
+            {isCreatingNew ? (
+              <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-400/30">
+                New Registration
+              </span>
+            ) : (
+              <ProvenanceBadge provenance="Patient Input" />
+            )}
           </div>
           <p className="text-slate-400 text-xs mt-1">
-            Manage patient self-reported demographic information, active symptoms, chronic conditions, and medication list.
+            {isCreatingNew 
+              ? 'Enter demographic info, active symptoms, chronic conditions, and medication details for the new patient.'
+              : 'Manage patient self-reported demographic information, active symptoms, chronic conditions, and medication list.'
+            }
           </p>
         </div>
 
-        {/* Quick Demo Case Selector */}
-        <div className="flex items-center gap-2 bg-slate-950 p-1.5 rounded-xl border border-slate-800 text-xs">
-          <span className="text-slate-400 font-medium px-2">Preset Profiles:</span>
-          {SAMPLE_PATIENTS.map((p) => (
+        {/* Action Controls: + New Patient & Case Selector */}
+        <div className="flex flex-wrap items-center gap-2">
+          {!isCreatingNew ? (
             <button
-              key={p.id}
-              onClick={() => selectPatient(p.id)}
-              className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors ${
-                patient.id === p.id 
-                  ? 'bg-sky-500 text-white shadow-sm' 
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
-              }`}
+              onClick={startNewPatient}
+              className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-sky-500 to-clinical-600 hover:from-sky-400 hover:to-clinical-500 text-white font-bold text-xs shadow-md shadow-sky-500/20 flex items-center gap-1.5 transition-all hover:scale-[1.02]"
             >
-              {p.name.split(' ')[0]} ({p.id})
+              <UserPlus className="w-4 h-4" />
+              + New Patient
             </button>
-          ))}
+          ) : (
+            <button
+              onClick={cancelNewPatient}
+              className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs border border-slate-700 transition-colors"
+            >
+              Cancel Registration
+            </button>
+          )}
+
+          {/* Quick Demo Selector */}
+          <div className="hidden md:flex items-center gap-1.5 bg-slate-950 p-1.5 rounded-xl border border-slate-800 text-xs">
+            <span className="text-slate-400 font-medium px-1">Presets:</span>
+            {patients.slice(0, 3).map((p) => (
+              <button
+                key={p.id}
+                onClick={() => selectPatient(p.id)}
+                className={`px-2 py-0.5 rounded text-[11px] font-semibold transition-colors ${
+                  !isCreatingNew && patient.id === p.id 
+                    ? 'bg-sky-500 text-white' 
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                {p.name.split(' ')[0]}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
       {savedSuccess && (
         <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs flex items-center gap-2 animate-fade-in">
           <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-          <span>Patient profile successfully saved to active session record!</span>
+          <span className="font-semibold">{savedSuccess}</span>
         </div>
       )}
 
@@ -125,15 +188,20 @@ export default function PatientPage() {
       <form onSubmit={handleSave} className="space-y-6">
         
         {/* Core Demographics Card */}
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-4">
-          <h2 className="font-bold text-sm text-slate-200 flex items-center gap-2 border-b border-slate-800 pb-3">
-            <FileSpreadsheet className="w-4 h-4 text-sky-400" />
-            Basic Patient Identifiers & Demographics
-          </h2>
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-4 shadow-xl">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+            <h2 className="font-bold text-sm text-slate-200 flex items-center gap-2">
+              <FileSpreadsheet className="w-4 h-4 text-sky-400" />
+              Basic Patient Identifiers & Demographics
+            </h2>
+            <span className="text-xs text-slate-400 font-mono">
+              Status: {isCreatingNew ? 'Draft Profile' : 'Saved Patient'}
+            </span>
+          </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 text-xs">
             <div>
-              <label className="block text-slate-400 font-medium mb-1">Patient ID</label>
+              <label className="block text-slate-400 font-medium mb-1">Patient ID (Auto-Generated)</label>
               <input
                 type="text"
                 value={formData.id}
@@ -144,18 +212,19 @@ export default function PatientPage() {
             </div>
 
             <div className="sm:col-span-2">
-              <label className="block text-slate-400 font-medium mb-1">Full Patient Name</label>
+              <label className="block text-slate-400 font-medium mb-1">Full Patient Name *</label>
               <input
                 type="text"
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                placeholder="e.g. Jane Doe"
                 className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-800 text-white font-medium focus:outline-none focus:border-sky-500"
                 required
               />
             </div>
 
             <div>
-              <label className="block text-slate-400 font-medium mb-1">Age (Years)</label>
+              <label className="block text-slate-400 font-medium mb-1">Age (Years) *</label>
               <input
                 type="number"
                 value={formData.age}
@@ -168,7 +237,7 @@ export default function PatientPage() {
             </div>
 
             <div>
-              <label className="block text-slate-400 font-medium mb-1">Sex</label>
+              <label className="block text-slate-400 font-medium mb-1">Biological Sex *</label>
               <select
                 value={formData.sex}
                 onChange={(e) => setFormData({ ...formData, sex: e.target.value as any })}
@@ -197,7 +266,7 @@ export default function PatientPage() {
                 type="text"
                 value={newSymptom}
                 onChange={(e) => setNewSymptom(e.target.value)}
-                placeholder="e.g. Fatigue, Dizziness"
+                placeholder="e.g. Fatigue, Fever, Shortness of breath"
                 className="flex-1 px-3 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-xs text-white focus:outline-none focus:border-sky-500"
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
@@ -242,7 +311,7 @@ export default function PatientPage() {
                 type="text"
                 value={newCondition}
                 onChange={(e) => setNewCondition(e.target.value)}
-                placeholder="e.g. Type 2 Diabetes, Hypertension"
+                placeholder="e.g. Type 2 Diabetes, Hypertension, Asthma"
                 className="flex-1 px-3 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-xs text-white focus:outline-none focus:border-sky-500"
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
@@ -332,7 +401,7 @@ export default function PatientPage() {
                 type="text"
                 value={newMedication}
                 onChange={(e) => setNewMedication(e.target.value)}
-                placeholder="e.g. Metformin 500mg, Lisinopril 10mg"
+                placeholder="e.g. Metformin 500mg, Amoxicillin"
                 className="flex-1 px-3 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-xs text-white focus:outline-none focus:border-sky-500"
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
@@ -369,12 +438,22 @@ export default function PatientPage() {
 
         {/* Submit Actions */}
         <div className="flex items-center justify-end gap-3 pt-2">
+          {isCreatingNew && (
+            <button
+              type="button"
+              onClick={cancelNewPatient}
+              className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs border border-slate-700 transition-colors"
+            >
+              Cancel
+            </button>
+          )}
+
           <button
             type="submit"
             className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-sky-500 to-clinical-600 hover:from-sky-400 hover:to-clinical-500 text-white font-bold text-xs shadow-lg shadow-sky-500/25 flex items-center gap-2 transition-all hover:scale-[1.02]"
           >
             <Save className="w-4 h-4" />
-            Save Patient Profile Changes
+            {isCreatingNew ? 'Create Patient Profile & Initialize Timeline' : 'Save Patient Profile Changes'}
           </button>
         </div>
 

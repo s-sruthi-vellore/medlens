@@ -2,6 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useMedLens } from '@/context/MedLensContext';
 import { StatusBadge } from '@/components/StatusBadge';
 import { ProvenanceBadge } from '@/components/ProvenanceBadge';
@@ -20,17 +21,24 @@ import {
   Flame,
   HelpCircle,
   Clock,
-  Calendar
+  Calendar,
+  UserPlus
 } from 'lucide-react';
 
 export default function DashboardPage() {
-  const { patient, tests, reports, conflicts, aiSummary, timelineEvents, loadSampleData } = useMedLens();
+  const router = useRouter();
+  const { patient, tests, reports, conflicts, aiSummary, timelineEvents, loadSampleData, startNewPatient } = useMedLens();
 
   const highCount = tests.filter(t => t.status === 'HIGH').length;
   const lowCount = tests.filter(t => t.status === 'LOW').length;
   const undeterCount = tests.filter(t => t.status === 'CANNOT DETERMINE').length;
   const normalCount = tests.filter(t => t.status === 'NORMAL').length;
   const unresolvedConflicts = conflicts.filter(c => !c.resolved).length;
+
+  const handleCreateNewPatient = () => {
+    startNewPatient();
+    router.push('/patient');
+  };
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -57,20 +65,20 @@ export default function DashboardPage() {
 
           <div className="flex flex-wrap items-center gap-3">
             <button
+              onClick={handleCreateNewPatient}
+              className="px-4 py-2 rounded-xl bg-sky-500 hover:bg-sky-400 text-white font-bold text-xs flex items-center gap-1.5 shadow-lg shadow-sky-500/25 transition-all"
+            >
+              <UserPlus className="w-4 h-4" />
+              + New Patient
+            </button>
+
+            <button
               onClick={() => loadSampleData(0)}
-              className="px-4 py-2 rounded-xl bg-sky-500/20 hover:bg-sky-500/30 border border-sky-400/40 text-sky-300 font-semibold text-xs flex items-center gap-2 transition-all"
+              className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 font-semibold text-xs flex items-center gap-2 transition-all"
             >
               <Flame className="w-4 h-4 text-sky-400" />
               Reset Demo Profile
             </button>
-
-            <Link
-              href="/upload"
-              className="px-4 py-2 rounded-xl bg-gradient-to-r from-sky-500 to-clinical-600 hover:from-sky-400 hover:to-clinical-500 text-white font-semibold text-xs flex items-center gap-2 shadow-lg shadow-sky-500/25 transition-all"
-            >
-              <UploadCloud className="w-4 h-4" />
-              Upload Medical Report
-            </Link>
           </div>
         </div>
       </div>
@@ -198,14 +206,22 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            <div className="border-t border-slate-800 pt-3">
+            <div className="border-t border-slate-800 pt-3 flex items-center justify-between">
               <Link 
                 href="/patient" 
-                className="text-xs font-semibold text-sky-400 hover:text-sky-300 flex items-center justify-between"
+                className="text-xs font-semibold text-sky-400 hover:text-sky-300 flex items-center gap-1"
               >
-                <span>Edit Full Patient Profile</span>
+                <span>Edit Profile</span>
                 <ArrowRight className="w-3.5 h-3.5" />
               </Link>
+
+              <button
+                onClick={handleCreateNewPatient}
+                className="text-xs font-semibold text-sky-400 hover:text-sky-300 flex items-center gap-1"
+              >
+                <UserPlus className="w-3.5 h-3.5" />
+                <span>+ New Patient</span>
+              </button>
             </div>
           </div>
 
